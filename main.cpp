@@ -23,24 +23,24 @@ struct basic_string_view
 	using size_type = std::size_t;
 	using difference_type = std::ptrdiff_t;
 
-	static constexpr size_type npos = (size_type)-1;
+	static size_type const npos = (size_type)-1;
 
-	constexpr basic_string_view() noexcept
+	basic_string_view() noexcept
 		: m_first(nullptr), m_last(nullptr)
 	{
 	}
 
-	constexpr basic_string_view(basic_string_view const & o) noexcept
+	basic_string_view(basic_string_view const & o) noexcept
 		: m_first(o.m_first), m_last(o.m_last)
 	{
 	}
 
-	constexpr basic_string_view(T const * s, size_type size) noexcept
+	basic_string_view(T const * s, size_type size) noexcept
 		: m_first(s), m_last(s + size)
 	{
 	}
 
-	constexpr basic_string_view(T const * s)
+	basic_string_view(T const * s)
 		: m_first(s), m_last(s + Traits::length(s))
 	{
 	}
@@ -57,22 +57,22 @@ struct basic_string_view
 	const_reverse_iterator rend() const noexcept { return m_first; };
 	const_reverse_iterator crend() const noexcept { return m_first; };
 
-	constexpr const_reference operator[](size_type pos) const noexcept { return m_first[pos]; }
+	const_reference operator[](size_type pos) const noexcept { return m_first[pos]; }
 
-	constexpr const_reference at(size_type pos) const
+	const_reference at(size_type pos) const
 	{
 		if (pos > this->size())
 			throw std::out_of_range("index out of range");
 		return m_first[pos];
 	}
 
-	constexpr const_reference front() const noexcept { return m_first[0]; }
-	constexpr const_reference back() const noexcept { return m_last[-1]; }
-	constexpr const_pointer data() const noexcept { return m_first; }
+	const_reference front() const noexcept { return m_first[0]; }
+	const_reference back() const noexcept { return m_last[-1]; }
+	const_pointer data() const noexcept { return m_first; }
 
-	constexpr size_type size() const noexcept { return m_last - m_first; }
-	constexpr size_type length() const noexcept { return this->size(); }
-	constexpr bool empty() const noexcept { return m_first == m_last; }
+	size_type size() const noexcept { return m_last - m_first; }
+	size_type length() const noexcept { return this->size(); }
+	bool empty() const noexcept { return m_first == m_last; }
 
 	void remove_prefix(size_type n) noexcept { m_first += n; }
 	void remove_suffix(size_type n) noexcept { m_last -= n; }
@@ -91,7 +91,7 @@ struct basic_string_view
 		return ss.size();
 	}
 
-	constexpr basic_string_view substr(size_type pos = 0, size_type count = npos) const
+	basic_string_view substr(size_type pos = 0, size_type count = npos) const
 	{
 		size_type size = this->size();
 		if (pos >= size)
@@ -100,7 +100,7 @@ struct basic_string_view
 		return basic_string_view(m_first + pos, m_first + pos + count);
 	}
 
-	constexpr int compare(basic_string_view o) const noexcept
+	int compare(basic_string_view o) const noexcept
 	{
 		size_type prefix_size = (std::min)(this->size(), o.size());
 		int r = Traits::compare(m_first, o.m_first, prefix_size);
@@ -113,32 +113,32 @@ struct basic_string_view
 		return 0;
 	}
 
-	friend constexpr bool operator==(basic_string_view lhs, basic_string_view rhs)
+	friend bool operator==(basic_string_view lhs, basic_string_view rhs)
 	{
 		return lhs.compare(rhs) == 0;
 	}
 
-	friend constexpr bool operator!=(basic_string_view lhs, basic_string_view rhs)
+	friend bool operator!=(basic_string_view lhs, basic_string_view rhs)
 	{
 		return lhs.compare(rhs) != 0;
 	}
 
-	friend constexpr bool operator<(basic_string_view lhs, basic_string_view rhs)
+	friend bool operator<(basic_string_view lhs, basic_string_view rhs)
 	{
 		return lhs.compare(rhs) < 0;
 	}
 
-	friend constexpr bool operator<=(basic_string_view lhs, basic_string_view rhs)
+	friend bool operator<=(basic_string_view lhs, basic_string_view rhs)
 	{
 		return lhs.compare(rhs) <= 0;
 	}
 
-	friend constexpr bool operator>(basic_string_view lhs, basic_string_view rhs)
+	friend bool operator>(basic_string_view lhs, basic_string_view rhs)
 	{
 		return lhs.compare(rhs) > 0;
 	}
 
-	friend constexpr bool operator>=(basic_string_view lhs, basic_string_view rhs)
+	friend bool operator>=(basic_string_view lhs, basic_string_view rhs)
 	{
 		return lhs.compare(rhs) >= 0;
 	}
