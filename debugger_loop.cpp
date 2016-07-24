@@ -4,6 +4,7 @@
 
 #include <map>
 #include <set>
+#include <cassert>
 
 #include <windows.h>
 
@@ -74,10 +75,19 @@ BOOL CALLBACK SymEnumLinesProc(PSRCCODEINFOW LineInfo, PVOID UserContext) noexce
 	}
 }
 
-#include <cassert>
-
-coverage_info debugger_loop(std::wstring const & sympath)
+coverage_info capture_coverage(std::wstring cmdline, std::wstring const & sympath)
 {
+	STARTUPINFOW si = { sizeof si };
+	PROCESS_INFORMATION pi;
+	if (!CreateProcessW(nullptr, &cmdline[0], nullptr, nullptr, FALSE,
+		DEBUG_PROCESS, nullptr, nullptr, &si, &pi))
+	{
+		throw std::runtime_error("can't create process");
+	}
+
+	CloseHandle(pi.hThread);
+	CloseHandle(pi.hProcess);
+
 	breakpoints bkpts;
 
 	auto load_module = [&](HANDLE hProcess, HANDLE hFile, DWORD64 base) {

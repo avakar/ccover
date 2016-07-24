@@ -24,7 +24,7 @@ struct coverage_info
 	void store(std::ostream & out);
 };
 
-coverage_info debugger_loop(std::wstring const & sympath);
+coverage_info capture_coverage(std::wstring cmdline, std::wstring const & sympath);
 
 
 #endif // DEBUGGER_LOOP_H

@@ -4,14 +4,14 @@
 #include <fstream>
 #include <windows.h>
 
-struct opts
+struct capture_opts
 {
 	bool print_help;
 	std::wstring sympath;
 	std::wstring covinfo_fname;
 	std::wstring win_cmdline;
 
-	opts()
+	capture_opts()
 		: print_help(false)
 	{
 	}
@@ -76,34 +76,36 @@ int main()
 	wstring_view cmdline = GetCommandLineW();
 	std::wstring arg0 = split_filename(win_split_cmdline_arg(cmdline)).second;
 
-	opts opts;
-	opts.parse(cmdline);
+	std::wstring mode = win_split_cmdline_arg(cmdline);
 
-	if (opts.print_help || opts.covinfo_fname.empty())
+	if (mode == L"capture")
 	{
-		std::wcout << L"Usage: " << arg0 << L" -o output [-y sympath] [--] command [args ...]\n";
+		capture_opts opts;
+		opts.parse(cmdline);
+
+		if (opts.print_help || opts.covinfo_fname.empty())
+		{
+			std::wcout << L"Usage: " << arg0 << L" capture -o <output> [-y <sympath>] [--] <command> [<arg> ...]\n";
+			return 2;
+		}
+
+		std::ofstream fcovinfo(opts.covinfo_fname.c_str(), std::ios::binary);
+		if (!fcovinfo)
+		{
+			std::wcerr << arg0 << L": error: cannot open the output file\n";
+			return 2;
+		}
+
+		coverage_info ci = capture_coverage(opts.win_cmdline, opts.sympath);
+		ci.store(fcovinfo);
+		return 0;
+	}
+	else if (mode == L"report")
+	{
+	}
+	else
+	{
+		std::wcout << L"Usage: " << arg0 << L" { capture | merge | report } [...]\n";
 		return 2;
 	}
-
-	std::ofstream fcovinfo(opts.covinfo_fname.c_str(), std::ios::binary);
-	if (!fcovinfo)
-	{
-		std::wcerr << arg0 << L": error: cannot open the output file\n";
-		return 2;
-	}
-
-	STARTUPINFOW si = { sizeof si };
-	PROCESS_INFORMATION pi;
-	if (!CreateProcessW(nullptr, &opts.win_cmdline[0], nullptr, nullptr, FALSE,
-		DEBUG_PROCESS, nullptr, nullptr, &si, &pi))
-	{
-		throw std::runtime_error("can't create process");
-	}
-
-	CloseHandle(pi.hThread);
-	CloseHandle(pi.hProcess);
-
-	coverage_info ci = debugger_loop(opts.sympath);
-	ci.store(fcovinfo);
-	return 0;
 }
