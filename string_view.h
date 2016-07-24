@@ -36,6 +36,11 @@ struct basic_string_view
 	{
 	}
 
+	basic_string_view(T const * first, T const * last) noexcept
+		: m_first(first), m_last(last)
+	{
+	}
+
 	basic_string_view(T const * s, size_type size) noexcept
 		: m_first(s), m_last(s + size)
 	{

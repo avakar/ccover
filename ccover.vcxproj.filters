@@ -4,11 +4,14 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="cmdline.cpp" />
     <ClCompile Include="debugger_loop.cpp" />
+    <ClCompile Include="coverage_info.cpp" />
+    <ClCompile Include="utf.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="string_view.h" />
     <ClInclude Include="cmdline.h" />
     <ClInclude Include="debugger_loop.h" />
     <ClInclude Include="guid.h" />
+    <ClInclude Include="utf.h" />
   </ItemGroup>
 </Project>

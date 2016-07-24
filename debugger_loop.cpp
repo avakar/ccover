@@ -8,6 +8,7 @@
 #include <windows.h>
 
 #pragma warning(push)
+// 'typedef ': ignored on left of '' when no variable is declared
 #pragma warning(disable:4091)
 #include <dbghelp.h>
 #pragma warning(pop)
@@ -20,6 +21,9 @@ struct addr_info
 
 struct pdb_info
 {
+	uint32_t image_size;
+	uint32_t timestamp;
+	std::wstring filename;
 	std::set<HANDLE> processes;
 	std::map<uint64_t, addr_info> addrs;
 };
@@ -71,7 +75,7 @@ BOOL CALLBACK SymEnumLinesProc(PSRCCODEINFOW LineInfo, PVOID UserContext) noexce
 
 #include <cassert>
 
-void debugger_loop(std::wstring const & sympath)
+coverage_info debugger_loop(std::wstring const & sympath)
 {
 	breakpoints bkpts;
 
@@ -83,10 +87,12 @@ void debugger_loop(std::wstring const & sympath)
 		if (!SymGetModuleInfoW64(hProcess, base, &im))
 			throw std::runtime_error("get module info error");
 
-		if (im.SymType == SymPdb)
+		if (im.SymType == SymPdb && im.LineNumbers)
 		{
 			guid pdb_guid;
 			memcpy(pdb_guid.data, &im.PdbSig70, sizeof pdb_guid.data);
+			if (pdb_guid.is_null())
+				return;
 
 			pdb_info * pi;
 			bool orig_bytes_known;
@@ -96,6 +102,10 @@ void debugger_loop(std::wstring const & sympath)
 			{
 				pi = &bkpts.pdbs[pdb_guid];
 				orig_bytes_known = false;
+
+				pi->image_size = im.ImageSize;
+				pi->timestamp = im.TimeDateStamp;
+				pi->filename = im.LoadedPdbName;
 
 				sym_enum_ctx ctx = { pi };
 				SymEnumLinesW(hProcess, base, nullptr, nullptr, &SymEnumLinesProc, &ctx);
@@ -218,7 +228,26 @@ void debugger_loop(std::wstring const & sympath)
 			if (process_handles.empty())
 			{
 				ContinueDebugEvent(de.dwProcessId, de.dwThreadId, DBG_EXCEPTION_NOT_HANDLED);
-				return;
+
+				coverage_info ci;
+				ci.pdbs.reserve(bkpts.pdbs.size());
+				for (auto && pdb_kv: bkpts.pdbs)
+				{
+					ci.pdbs.emplace_back();
+					auto & pdb_info = ci.pdbs.back();
+					pdb_info.pdb_guid = pdb_kv.first;
+					pdb_info.image_size = pdb_kv.second.image_size;
+					pdb_info.timestamp = pdb_kv.second.timestamp;
+					pdb_info.filename = pdb_kv.second.filename;
+					for (auto && addr_kv: pdb_kv.second.addrs)
+					{
+						if (addr_kv.second.covered)
+							pdb_info.addrs_covered.push_back(addr_kv.first);
+						else
+							pdb_info.addrs_uncovered.push_back(addr_kv.first);
+					}
+				}
+				return ci;
 			}
 			break;
 
