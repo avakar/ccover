@@ -53,6 +53,55 @@ struct capture_opts
 	}
 };
 
+struct report_opts
+{
+	std::vector<std::wstring> input_files;
+	std::wstring sympath;
+	std::wstring output_file;
+
+	report_opts()
+		: output_file(L"-")
+	{
+	}
+
+	bool parse(wstring_view cmdline)
+	{
+		bool ignore_opts = false;
+		while (!cmdline.empty())
+		{
+			std::wstring arg = win_split_cmdline_arg(cmdline);
+
+			if (!ignore_opts)
+			{
+				if (arg == L"-y" || arg == L"--sympath")
+				{
+					sympath = win_split_cmdline_arg(cmdline);
+					continue;
+				}
+
+				if (arg == L"-o" || arg == L"--output")
+				{
+					output_file = win_split_cmdline_arg(cmdline);
+					continue;
+				}
+
+				if (arg == L"--")
+				{
+					ignore_opts = true;
+					continue;
+				}
+
+				if (arg[0] == L'-')
+					return false;
+			}
+
+			input_files.push_back(arg);
+		}
+
+		return !input_files.empty();
+	}
+};
+
 int main()
 {
 	wstring_view cmdline = GetCommandLineW();
@@ -67,7 +116,7 @@ int main()
 
 		if (opts.print_help || opts.covinfo_fname.empty())
 		{
-			std::wcout << L"Usage: " << arg0 << L" capture -o <output> [-y <sympath>] [--] <command> [<arg> ...]\n";
+			std::wcerr << L"Usage: " << arg0 << L" capture -o <output> [-y <sympath>] [--] <command> [<arg> ...]\n";
 			return 2;
 		}
 
@@ -75,7 +124,7 @@ int main()
 		if (!fcovinfo)
 		{
 			std::wcerr << arg0 << L": error: cannot open the output file\n";
-			return 2;
+			return 3;
 		}
 
 		coverage_info ci = capture_coverage(opts.win_cmdline, opts.sympath);
@@ -84,11 +133,30 @@ int main()
 	}
 	else if (mode == L"report")
 	{
+		report_opts opts;
+		if (!opts.parse(cmdline))
+		{
+			std::wcerr << L"Usage: " << arg0 << L" report [-o <output>] [-y <sympath>] <input> [...]\n";
+			return 2;
+		}
 
+		coverage_info ci;
+		for (std::wstring const & input: opts.input_files)
+		{
+			std::ifstream fin(input.c_str(), std::ios::binary);
+			if (!fin)
+			{
+				std::wcerr << arg0 << L": error: cannot open input file: " << input << L"\n";
+				return 3;
+			}
+
+			coverage_info partial_ci;
+			partial_ci.load(fin);
+		}
 	}
 	else
 	{
-		std::wcout << L"Usage: " << arg0 << L" { capture | merge | report } [...]\n";
+		std::wcerr << L"Usage: " << arg0 << L" { capture | merge | report } [...]\n";
 		return 2;
 	}
 }

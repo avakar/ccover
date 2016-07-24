@@ -20,3 +20,20 @@ std::string utf16_to_utf8(wstring_view s)
 	return res;
 }
 
+std::wstring utf8_to_utf16(string_view s)
+{
+	int r = MultiByteToWideChar(CP_UTF8, 0, s.data(), s.size(), nullptr, 0);
+	if (r < 0)
+		throw std::runtime_error("failed to convert from utf-8");
+
+	std::wstring res;
+	if (r != 0)
+	{
+		res.resize((size_t)r + 1);
+		r = MultiByteToWideChar(CP_UTF8, 0, s.data(), s.size(), &res[0], res.size());
+		if (r < 0 || r > res.size() - 1)
+			throw std::runtime_error("failed to convert from utf-8");
+		res.resize((size_t)r);
+	}
+	return res;
+}

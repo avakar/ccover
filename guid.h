@@ -20,6 +20,42 @@ struct guid
 		return true;
 	}
 
+	static guid from_string(string_view s)
+	{
+		auto pull_digit = [&]() -> uint8_t {
+
+			while (!s.empty())
+			{
+				char ch = s.front();
+				s.remove_prefix(1);
+
+				if (ch == '-')
+					continue;
+
+				if ('0' <= ch && ch <= '9')
+					return ch - '0';
+				if ('a' <= ch && ch <= 'f')
+					return ch - 'a' + 10;
+				if ('A' <= ch && ch <= 'F')
+					return ch - 'A' + 10;
+
+				throw std::runtime_error("invalid character in a guid");
+			}
+
+			throw std::runtime_error("guid too short");
+		};
+
+		auto pull_byte = [&]() {
+			uint8_t b = pull_digit() << 4;
+			b |= pull_digit();
+			return b;
+		};
+
+		guid res;
+		std::generate(res.data, res.data + 16, pull_byte);
+		return res;
+	}
+
 	std::string to_string() const
 	{
 		static char const digits[] = "0123456789abcdef";

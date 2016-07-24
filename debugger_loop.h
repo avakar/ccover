@@ -21,6 +21,7 @@ struct coverage_info
 {
 	std::vector<pdb_coverage_info> pdbs;
 
+	static coverage_info load(std::istream & in);
 	void store(std::ostream & out);
 };
 
