@@ -24,6 +24,7 @@
     <ClCompile Include="debugger_loop.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="utf.cpp" />
+    <ClCompile Include="utils.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="cmdline.h" />
@@ -31,6 +32,7 @@
     <ClInclude Include="guid.h" />
     <ClInclude Include="string_view.h" />
     <ClInclude Include="utf.h" />
+    <ClInclude Include="utils.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{8EA82FE3-2699-47F2-8FE5-807C7D52A493}</ProjectGuid>
