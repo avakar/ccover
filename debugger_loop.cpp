@@ -24,7 +24,7 @@ struct pdb_info
 	uint32_t image_size;
 	uint32_t timestamp;
 	std::wstring filename;
-	std::set<HANDLE> processes;
+	std::map<HANDLE, uint64_t> processes;
 	std::map<uint64_t, addr_info> addrs;
 };
 
@@ -54,6 +54,7 @@ struct breakpoints
 struct sym_enum_ctx
 {
 	pdb_info * pi;
+	uint64_t base;
 	std::exception_ptr exc;
 };
 
@@ -63,7 +64,7 @@ BOOL CALLBACK SymEnumLinesProc(PSRCCODEINFOW LineInfo, PVOID UserContext) noexce
 
 	try
 	{
-		ctx.pi->addrs[LineInfo->Address];
+		ctx.pi->addrs[LineInfo->Address - ctx.base];
 		return TRUE;
 	}
 	catch (...)
@@ -107,7 +108,7 @@ coverage_info debugger_loop(std::wstring const & sympath)
 				pi->timestamp = im.TimeDateStamp;
 				pi->filename = im.LoadedPdbName;
 
-				sym_enum_ctx ctx = { pi };
+				sym_enum_ctx ctx = { pi, im.BaseOfImage };
 				SymEnumLinesW(hProcess, base, nullptr, nullptr, &SymEnumLinesProc, &ctx);
 				if (ctx.exc != nullptr)
 					std::rethrow_exception(ctx.exc);
@@ -119,18 +120,20 @@ coverage_info debugger_loop(std::wstring const & sympath)
 			}
 
 			assert(pi->processes.find(hProcess) == pi->processes.end());
-			pi->processes.insert(hProcess);
+			pi->processes[hProcess] = im.BaseOfImage;
 
 			for (auto && kv: pi->addrs)
 			{
-				global_address ga = { hProcess, kv.first };
+				uint64_t addr = im.BaseOfImage + kv.first;
+
+				global_address ga = { hProcess, addr };
 				bkpts.addrs[ga] = pi;
 
 				if (kv.second.covered)
 					continue;
 
 				uint8_t buf;
-				if (!ReadProcessMemory(hProcess, (LPCVOID)kv.first, &buf, 1, nullptr))
+				if (!ReadProcessMemory(hProcess, (LPCVOID)addr, &buf, 1, nullptr))
 					throw std::runtime_error("cannot read process memory"); // XXX: maybe we can ignore?
 
 				assert(!orig_bytes_known || buf == kv.second.orig_byte);
@@ -139,7 +142,7 @@ coverage_info debugger_loop(std::wstring const & sympath)
 				if (kv.second.orig_byte != 0xcc)
 				{
 					buf = 0xcc;
-					if (!WriteProcessMemory(hProcess, (LPVOID)kv.first, &buf, 1, nullptr))
+					if (!WriteProcessMemory(hProcess, (LPVOID)addr, &buf, 1, nullptr))
 						throw std::runtime_error("cannot write process memory"); // XXX: maybe we can ignore?
 				}
 			}
@@ -156,14 +159,17 @@ coverage_info debugger_loop(std::wstring const & sympath)
 
 		pdb_info * pi = pi_it->second;
 
-		auto & addr_info = pi->addrs[exc_addr];
+		uint64_t base = pi->processes.find(hProcess)->second;
+		uint64_t addr = exc_addr - base;
+
+		auto & addr_info = pi->addrs[addr];
 		addr_info.covered = true;
 
 		if (addr_info.orig_byte == 0xcc)
 			return DBG_EXCEPTION_NOT_HANDLED;
 
-		for (HANDLE hProcess: pi->processes)
-			WriteProcessMemory(hProcess, (LPVOID)exc_addr, &addr_info.orig_byte, 1, nullptr);
+		for (auto handle_base: pi->processes)
+			WriteProcessMemory(handle_base.first,  (LPVOID)(handle_base.second + addr), &addr_info.orig_byte, 1, nullptr);
 
 		CONTEXT ctx = {};
 		ctx.ContextFlags = CONTEXT_CONTROL;
