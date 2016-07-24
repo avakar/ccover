@@ -150,8 +150,7 @@ int main()
 				return 3;
 			}
 
-			coverage_info partial_ci;
-			partial_ci.load(fin);
+			ci.merge(coverage_info::load(fin));
 		}
 	}
 	else

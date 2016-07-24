@@ -246,12 +246,9 @@ coverage_info capture_coverage(std::wstring cmdline, std::wstring const & sympat
 				ContinueDebugEvent(de.dwProcessId, de.dwThreadId, DBG_EXCEPTION_NOT_HANDLED);
 
 				coverage_info ci;
-				ci.pdbs.reserve(bkpts.pdbs.size());
 				for (auto && pdb_kv: bkpts.pdbs)
 				{
-					ci.pdbs.emplace_back();
-					auto & pdb_info = ci.pdbs.back();
-					pdb_info.pdb_guid = pdb_kv.first;
+					pdb_coverage_info & pdb_info = ci.pdbs[pdb_kv.first];
 					pdb_info.image_size = pdb_kv.second.image_size;
 					pdb_info.timestamp = pdb_kv.second.timestamp;
 					pdb_info.filename = pdb_kv.second.filename;

@@ -4,12 +4,12 @@
 #include "string_view.h"
 #include "guid.h"
 #include <vector>
+#include <map>
 #include <string>
 #include <stdint.h>
 
 struct pdb_coverage_info
 {
-	guid pdb_guid;
 	std::wstring filename;
 	uint32_t image_size;
 	uint32_t timestamp;
@@ -18,7 +18,9 @@ struct pdb_coverage_info
 
 struct coverage_info
 {
-	std::vector<pdb_coverage_info> pdbs;
+	std::map<guid, pdb_coverage_info> pdbs;
+
+	void merge(coverage_info && ci);
 
 	static coverage_info load(std::istream & in);
 	void store(std::ostream & out);
