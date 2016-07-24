@@ -14,6 +14,8 @@
 #include <dbghelp.h>
 #pragma warning(pop)
 
+namespace {
+
 struct addr_info
 {
 	uint8_t orig_byte;
@@ -59,7 +61,9 @@ struct sym_enum_ctx
 	std::exception_ptr exc;
 };
 
-BOOL CALLBACK SymEnumLinesProc(PSRCCODEINFOW LineInfo, PVOID UserContext) noexcept
+}
+
+static BOOL CALLBACK SymEnumLinesProc(PSRCCODEINFOW LineInfo, PVOID UserContext) noexcept
 {
 	sym_enum_ctx & ctx = *static_cast<sym_enum_ctx *>(UserContext);
 

@@ -7,6 +7,7 @@
     <ClCompile Include="coverage_info.cpp" />
     <ClCompile Include="utf.cpp" />
     <ClCompile Include="utils.cpp" />
+    <ClCompile Include="report.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="string_view.h" />
@@ -15,5 +16,6 @@
     <ClInclude Include="guid.h" />
     <ClInclude Include="utf.h" />
     <ClInclude Include="utils.h" />
+    <ClInclude Include="json.h" />
   </ItemGroup>
 </Project>

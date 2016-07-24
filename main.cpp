@@ -102,6 +102,48 @@ struct report_opts
 	}
 };
 
+struct merge_opts
+{
+	std::vector<std::wstring> input_files;
+	std::wstring output_file;
+
+	merge_opts()
+		: output_file(L"-")
+	{
+	}
+
+	bool parse(wstring_view cmdline)
+	{
+		bool ignore_opts = false;
+		while (!cmdline.empty())
+		{
+			std::wstring arg = win_split_cmdline_arg(cmdline);
+
+			if (!ignore_opts)
+			{
+				if (arg == L"-o" || arg == L"--output")
+				{
+					output_file = win_split_cmdline_arg(cmdline);
+					continue;
+				}
+
+				if (arg == L"--")
+				{
+					ignore_opts = true;
+					continue;
+				}
+
+				if (arg[0] == L'-')
+					return false;
+			}
+
+			input_files.push_back(arg);
+		}
+
+		return !input_files.empty();
+	}
+};
+
 int main()
 {
 	wstring_view cmdline = GetCommandLineW();
@@ -131,6 +173,44 @@ int main()
 		ci.store(fcovinfo);
 		return 0;
 	}
+	else if (mode == L"merge")
+	{
+		merge_opts opts;
+		if (!opts.parse(cmdline))
+		{
+			std::wcerr << L"Usage: " << arg0 << L" merge [-o <output>] <input> [...]\n";
+			return 2;
+		}
+
+		coverage_info ci;
+		for (std::wstring const & input: opts.input_files)
+		{
+			std::ifstream fin(input.c_str(), std::ios::binary);
+			if (!fin)
+			{
+				std::wcerr << arg0 << L": error: cannot open input file: " << input << L"\n";
+				return 3;
+			}
+
+			ci.merge(coverage_info::load(fin));
+		}
+
+		if (opts.output_file == L"-")
+		{
+			ci.store(std::cout);
+		}
+		else
+		{
+			std::ofstream fout(opts.output_file.c_str(), std::ios::binary);
+			if (!fout)
+			{
+				std::wcerr << arg0 << L": error: cannot open the output file\n";
+				return 3;
+			}
+
+			ci.store(fout);
+		}
+	}
 	else if (mode == L"report")
 	{
 		report_opts opts;
@@ -151,6 +231,22 @@ int main()
 			}
 
 			ci.merge(coverage_info::load(fin));
+		}
+
+		coverage_report rep = report(ci, opts.sympath);
+		if (opts.output_file == L"-")
+		{
+			rep.store(std::cout);
+		}
+		else
+		{
+			std::ofstream fout(opts.output_file.c_str(), std::ios::binary);
+			if (!fout)
+			{
+				std::wcerr << arg0 << L": error: cannot open output file: " << opts.output_file << L"\n";
+				return 3;
+			}
+			rep.store(fout);
 		}
 	}
 	else

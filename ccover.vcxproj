@@ -23,6 +23,7 @@
     <ClCompile Include="coverage_info.cpp" />
     <ClCompile Include="debugger_loop.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="report.cpp" />
     <ClCompile Include="utf.cpp" />
     <ClCompile Include="utils.cpp" />
   </ItemGroup>
@@ -30,6 +31,7 @@
     <ClInclude Include="cmdline.h" />
     <ClInclude Include="debugger_loop.h" />
     <ClInclude Include="guid.h" />
+    <ClInclude Include="json.h" />
     <ClInclude Include="string_view.h" />
     <ClInclude Include="utf.h" />
     <ClInclude Include="utils.h" />
