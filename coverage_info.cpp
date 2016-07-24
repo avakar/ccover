@@ -1,5 +1,6 @@
 #include "debugger_loop.h"
 #include "utf.h"
+#include <cassert>
 
 struct json_writer
 {
@@ -105,9 +106,10 @@ private:
 struct json_reader
 {
 	json_reader(std::istream & in)
-		: m_in(in), m_exc_state(m_in.exceptions()), m_comma(false)
+		: m_in(in), m_exc_state(m_in.exceptions()), m_next(nx_unknown)
 	{
 		m_in.exceptions(std::ios::badbit | std::ios::failbit | std::ios::eofbit);
+		this->detect_next();
 	}
 
 	~json_reader()
@@ -118,36 +120,39 @@ struct json_reader
 	template <typename F>
 	void read_array(F && f)
 	{
-		this->comma();
 		this->consume('[');
-		m_comma = false;
 		while (!this->try_consume(']'))
 		{
+			this->detect_next();
 			f();
+			this->skip();
 		}
-		m_comma = true;
+
+		m_next = nx_comma;
 	}
 
 	template <typename F>
 	void read_object(F && f)
 	{
-		this->comma();
 		this->consume('{');
-		m_comma = false;
 		while (!this->try_consume('}'))
 		{
+			if (m_next == nx_comma)
+				this->consume(',');
+
 			std::string key = this->read_str();
 			this->consume(':');
-			m_comma = false;
 
+			this->detect_next();
 			f(std::move(key));
+			this->skip();
 		}
-		m_comma = true;
+
+		m_next = nx_comma;
 	}
 
 	std::string read_str()
 	{
-		this->comma();
 		this->consume('"');
 
 		std::string res;
@@ -158,7 +163,7 @@ struct json_reader
 
 			if (ch == '"')
 			{
-				m_comma = true;
+				m_next = nx_comma;
 				return res;
 			}
 
@@ -180,8 +185,6 @@ struct json_reader
 	template <typename Num>
 	Num read_num()
 	{
-		this->comma();
-
 		Num res = 0;
 
 		char ch;
@@ -206,7 +209,7 @@ struct json_reader
 				m_in.unget();
 				if (has_none)
 					throw std::runtime_error("expected number");
-				m_comma = true;
+				m_next = nx_comma;
 				return res;
 			}
 		}
@@ -214,12 +217,6 @@ struct json_reader
 
 private:
 	static bool is_ws(char ch) { return ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r'; }
-
-	void comma()
-	{
-		if (m_comma)
-			this->consume(',');
-	}
 
 	bool try_consume(char exp)
 	{
@@ -235,6 +232,7 @@ private:
 					return false;
 				}
 
+				m_next = nx_unknown;
 				return true;
 			}
 		}
@@ -247,8 +245,10 @@ private:
 
 	}
 
-	void skip_ws()
+	void detect_next()
 	{
+		if (m_next == nx_comma)
+			this->consume(',');
 
 		char ch;
 		do
@@ -257,12 +257,44 @@ private:
 		}
 		while (is_ws(ch));
 
+		if (ch == '{')
+			m_next = nx_object;
+		else if (ch == '[')
+			m_next = nx_array;
+		else if (ch == '"')
+			m_next = nx_str;
+		else if (ch == '-' || ('0' <= ch && ch <= '9'))
+			m_next = nx_num;
+		else
+			throw std::runtime_error("unexpected character");
+
 		m_in.unget();
+	}
+
+	void skip()
+	{
+		switch (m_next)
+		{
+		case nx_object:
+			this->read_object([](string_view) {});
+			break;
+		case nx_array:
+			this->read_array([]() {});
+			break;
+		case nx_num:
+			this->read_num<int>();
+			break;
+		case nx_str:
+			this->read_str();
+			break;
+		}
+
+		assert(m_next == nx_comma);
 	}
 
 	std::istream & m_in;
 	int m_exc_state;
-	bool m_comma;
+	enum { nx_unknown, nx_object, nx_array, nx_num, nx_str, nx_comma } m_next;
 };
 
 coverage_info coverage_info::load(std::istream & in)
@@ -285,10 +317,6 @@ coverage_info coverage_info::load(std::istream & in)
 				reader.read_array([&]() {
 					pdb_info.addrs_covered.push_back(reader.read_num<uint64_t>());
 				});
-			else if (key == "uncovered")
-				reader.read_array([&]() {
-				pdb_info.addrs_uncovered.push_back(reader.read_num<uint64_t>());
-			});
 		});
 
 		res.pdbs.push_back(pdb_info);
@@ -323,13 +351,6 @@ void coverage_info::store(std::ostream & out)
 		for (uint64_t addr: pdb_info.addrs_covered)
 			j.write_num(addr);
 		j.close_array();
-
-		j.write_key("uncovered");
-		j.open_array();
-		for (uint64_t addr: pdb_info.addrs_uncovered)
-			j.write_num(addr);
-		j.close_array();
-
 
 		j.close_object();
 	}

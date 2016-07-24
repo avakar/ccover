@@ -259,8 +259,6 @@ coverage_info capture_coverage(std::wstring cmdline, std::wstring const & sympat
 					{
 						if (addr_kv.second.covered)
 							pdb_info.addrs_covered.push_back(addr_kv.first);
-						else
-							pdb_info.addrs_uncovered.push_back(addr_kv.first);
 					}
 				}
 				return ci;

@@ -14,7 +14,6 @@ struct pdb_coverage_info
 	uint32_t image_size;
 	uint32_t timestamp;
 	std::vector<uint64_t> addrs_covered;
-	std::vector<uint64_t> addrs_uncovered;
 };
 
 struct coverage_info
