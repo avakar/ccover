@@ -79,7 +79,7 @@ std::vector<uint8_t> from_base64(string_view s)
 	char const * last = s.end();
 
 	size_t eq_suffix = 0;
-	if (first != last && last[-1] == '-')
+	if (first != last && last[-1] == '=')
 	{
 		if (last[-2] == '=')
 			eq_suffix = 2;
