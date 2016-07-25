@@ -44,23 +44,40 @@ static BOOL CALLBACK SymEnumLinesProc(PSRCCODEINFOW LineInfo, PVOID UserContext)
 coverage_report report(coverage_info const & ci, std::wstring const & sympath)
 {
 	HANDLE hp = (HANDLE)4;
-	uint64_t base = 0x10000;
 	SymInitializeW(hp, sympath.c_str(), FALSE);
 
 	report_ctx ctx;
-	ctx.base = base;
 	for (auto && kv: ci.pdbs)
 	{
-		wchar_t path[MAX_PATH+1];
-		if (SymFindFileInPathW(hp, nullptr, kv.second.filename.c_str(), (PVOID)&kv.first.data, 1, 0, SSRVOPT_GUIDPTR, path, nullptr, nullptr))
-			SymLoadModuleExW(hp, 0, path, nullptr, base, kv.second.image_size, nullptr, 0);
-		else
-			SymLoadModuleExW(hp, 0, kv.second.filename.c_str(), nullptr, base, kv.second.image_size, nullptr, 0);
+		std::vector<uint8_t> buf;
+		buf.resize(sizeof(MODLOAD_CVMISC) + kv.second.cv.size());
+
+		MODLOAD_CVMISC * cvmisc = (MODLOAD_CVMISC *)buf.data();
+		cvmisc->oCV = sizeof(MODLOAD_CVMISC);
+		cvmisc->cCV = kv.second.cv.size();
+		cvmisc->oMisc = 0;
+		cvmisc->cMisc = 0;
+		cvmisc->dtImage = kv.second.timestamp;
+		cvmisc->cImage = kv.second.image_size;
+		std::copy(kv.second.cv.begin(), kv.second.cv.end(), buf.data() + sizeof(MODLOAD_CVMISC));
+
+		MODLOAD_DATA md = {};
+		md.ssize = sizeof md;
+		md.ssig = DBHHEADER_CVMISC;
+		md.data = buf.data();
+		md.size = buf.size();
+
+		uint64_t base = SymLoadModuleExW(hp, 0, L"kkk", nullptr, 0x10000, kv.second.image_size, &md, 0);
+		if (base == 0)
+			throw std::runtime_error("failed to load symbols");
 
 		ctx.ci = &kv.second;
+		ctx.base = base;
 		SymEnumLinesW(hp, base, nullptr, nullptr, &SymEnumLinesProc, &ctx);
 		if (ctx.exc != nullptr)
 			std::rethrow_exception(ctx.exc);
+
+		SymUnloadModule64(hp, base);
 	}
 
 	coverage_report cr;

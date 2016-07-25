@@ -13,6 +13,7 @@ struct pdb_coverage_info
 	std::wstring filename;
 	uint32_t image_size;
 	uint32_t timestamp;
+	std::vector<uint8_t> cv;
 	std::vector<uint64_t> addrs_covered;
 };
 

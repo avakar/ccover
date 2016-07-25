@@ -14,6 +14,47 @@
 #include <dbghelp.h>
 #pragma warning(pop)
 
+struct mapping_holder
+{
+	explicit mapping_holder(void * base)
+		: m_base(base)
+	{
+	}
+
+	~mapping_holder()
+	{
+		UnmapViewOfFile(m_base);
+	}
+
+	void * m_base;
+};
+
+static std::vector<uint8_t> get_cv_record(HANDLE hFile)
+{
+	HANDLE hSection = CreateFileMappingW(hFile, nullptr, PAGE_READONLY, 0, 0, nullptr);
+	void * base = MapViewOfFileEx(hSection,  FILE_MAP_READ, 0, 0, 0, nullptr);
+	mapping_holder base_holder(base);
+	CloseHandle(hSection);
+
+	ULONG size;
+	auto * dd = (IMAGE_DEBUG_DIRECTORY *)ImageDirectoryEntryToData(base, FALSE, IMAGE_DIRECTORY_ENTRY_DEBUG, &size);
+	if (dd)
+	{
+		size_t entry_count = size / sizeof(IMAGE_DEBUG_DIRECTORY);
+
+		for (size_t i = 0; i < entry_count; ++i)
+		{
+			if (dd[i].Type == IMAGE_DEBUG_TYPE_CODEVIEW)
+			{
+				auto p = (uint8_t const *)base + dd[i].PointerToRawData;
+				return std::vector<uint8_t>(p, p + dd[i].SizeOfData);
+			}
+		}
+	}
+
+	return std::vector<uint8_t>();
+}
+
 namespace {
 
 struct addr_info
@@ -27,6 +68,7 @@ struct pdb_info
 	uint32_t image_size;
 	uint32_t timestamp;
 	std::wstring filename;
+	std::vector<uint8_t> cv;
 	std::map<HANDLE, uint64_t> processes;
 	std::map<uint64_t, addr_info> addrs;
 };
@@ -121,6 +163,7 @@ coverage_info capture_coverage(std::wstring cmdline, std::wstring const & sympat
 				pi->image_size = im.ImageSize;
 				pi->timestamp = im.TimeDateStamp;
 				pi->filename = im.LoadedPdbName;
+				pi->cv = get_cv_record(hFile);
 
 				sym_enum_ctx ctx = { pi, im.BaseOfImage };
 				SymEnumLinesW(hProcess, base, nullptr, nullptr, &SymEnumLinesProc, &ctx);
@@ -256,6 +299,7 @@ coverage_info capture_coverage(std::wstring cmdline, std::wstring const & sympat
 					pdb_info.image_size = pdb_kv.second.image_size;
 					pdb_info.timestamp = pdb_kv.second.timestamp;
 					pdb_info.filename = pdb_kv.second.filename;
+					pdb_info.cv = std::move(pdb_kv.second.cv);
 					for (auto && addr_kv: pdb_kv.second.addrs)
 					{
 						if (addr_kv.second.covered)

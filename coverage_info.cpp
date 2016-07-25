@@ -1,6 +1,7 @@
 #include "json.h"
 #include "debugger_loop.h"
 #include "utf.h"
+#include "utils.h"
 #include <cassert>
 
 coverage_info coverage_info::load(std::istream & in)
@@ -18,6 +19,8 @@ coverage_info coverage_info::load(std::istream & in)
 				pdb_info.timestamp = reader.read_num<uint32_t>();
 			else if (key == "image_size")
 				pdb_info.image_size = reader.read_num<uint32_t>();
+			else if (key == "cv_record")
+				pdb_info.cv = from_base64(reader.read_str());
 			else if (key == "pdb_guid")
 				pdb_guid = guid::from_string(reader.read_str());
 			else if (key == "covered")
@@ -51,6 +54,9 @@ void coverage_info::store(std::ostream & out)
 
 		j.write_key("image_size");
 		j.write_num(kv.second.image_size);
+
+		j.write_key("cv_record");
+		j.write_str(to_base64(kv.second.cv.data(), kv.second.cv.size()));
 
 		j.write_key("pdb_guid");
 		j.write_str(kv.first.to_string());
