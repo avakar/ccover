@@ -228,12 +228,25 @@ coverage_info capture_coverage(std::wstring cmdline, std::wstring const & sympat
 		for (auto handle_base: pi->processes)
 			WriteProcessMemory(handle_base.first,  (LPVOID)(handle_base.second + addr), &addr_info.orig_byte, 1, nullptr);
 
-		CONTEXT ctx = {};
-		ctx.ContextFlags = CONTEXT_CONTROL;
-		if (GetThreadContext(hThread, &ctx))
+		if (exc.ExceptionRecord.ExceptionCode == STATUS_BREAKPOINT)
 		{
-			ctx.Rip -= 1;
-			SetThreadContext(hThread, &ctx);
+			CONTEXT ctx = {};
+			ctx.ContextFlags = CONTEXT_CONTROL;
+			if (GetThreadContext(hThread, &ctx))
+			{
+				ctx.Rip -= 1;
+				SetThreadContext(hThread, &ctx);
+			}
+		}
+		else
+		{
+			WOW64_CONTEXT ctx = {};
+			ctx.ContextFlags = WOW64_CONTEXT_CONTROL;
+			if (Wow64GetThreadContext(hThread, &ctx))
+			{
+				ctx.Eip -= 1;
+				Wow64SetThreadContext(hThread, &ctx);
+			}
 		}
 		return DBG_CONTINUE;
 	};
@@ -323,7 +336,8 @@ coverage_info capture_coverage(std::wstring cmdline, std::wstring const & sympat
 			break;
 
 		case EXCEPTION_DEBUG_EVENT:
-			if (de.u.Exception.dwFirstChance && de.u.Exception.ExceptionRecord.ExceptionCode == STATUS_BREAKPOINT)
+			if (de.u.Exception.dwFirstChance
+				&& (de.u.Exception.ExceptionRecord.ExceptionCode == STATUS_BREAKPOINT || de.u.Exception.ExceptionRecord.ExceptionCode == 0x4000001f))
 			{
 				disp = process_breakpoint(hProcess, pi->threads[de.dwThreadId], de.u.Exception);
 			}
